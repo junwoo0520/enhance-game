@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>강화 게임</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f4f4f4;
+      padding: 30px;
+    }
+    .stats, .shop, .table, .weapons {
+      font-size: 16px;
+      margin: 15px 0;
+    }
+    #log {
+      margin-top: 20px;
+      height: 150px;
+      overflow-y: auto;
+      background: #fff;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+    button {
+      font-size: 14px;
+      margin: 5px;
+      padding: 6px 12px;
+    }
+    .weapon-btn {
+      margin: 5px;
+      padding: 6px 12px;
+      border: 2px solid #333;
+      background: #fff;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .selected {
+      background: #333;
+      color: #fff;
+    }
+    .weapon-box {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🗡 강화 게임 </h1>
+
+  <div class="stats">
+    💰 골드: <span id="gold">1000</span> |
+    🪙 강화권: <span id="tickets">10</span> |
+    🛡 보호권: <span id="protects">3</span>
+  </div>
+
+  <div class="weapons">
+    <h2>무기 선택 및 관리</h2>
+    <div id="weaponList"></div>
+  </div>
+
+  <div id="level">현재 무기: 없음</div>
+
+  <label>
+    <input type="checkbox" id="useProtect" />
+    실패 보호권 사용
+  </label>
+  <br />
+  <button id="upgradeBtn">강화하기</button>
+
+  <div class="shop">
+    <h2>🛒 상점</h2>
+    <button onclick="buy('ticket')">강화권 구매 (100G)</button>
+    <button onclick="buy('protect')">보호권 구매 (300G)</button>
+  </div>
+
+  <div class="table">
+    <h2>📊 확률표</h2>
+    <table>
+      <thead>
+        <tr><th>레벨</th><th>성공 확률</th></tr>
+      </thead>
+      <tbody id="chanceTable"></tbody>
+    </table>
+  </div>
+
+  <div>
+    <h2>🧹 전체 초기화</h2>
+    <button onclick="resetGame()">🔁 게임 초기화</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    let gold = 1000;
+    let tickets = 10;
+    let protects = 3;
+    let weapons = [
+      { name: "소드", level: 0 },
+      { name: "창", level: 0 },
+      { name: "활", level: 0 }
+    ];
+    let selectedWeaponIndex = 0;
+
+    const UI = {
+      level: document.getElementById("level"),
+      gold: document.getElementById("gold"),
+      tickets: document.getElementById("tickets"),
+      protects: document.getElementById("protects"),
+      useProtect: document.getElementById("useProtect"),
+      log: document.getElementById("log"),
+      table: document.getElementById("chanceTable"),
+      weaponList: document.getElementById("weaponList"),
+      upgradeBtn: document.getElementById("upgradeBtn")
+    };
+
+    function getSuccessChance(lv) {
+      return Math.max(100 - lv * 10, 10);
+    }
+
+    function getSellPrice(level) {
+      return level * 150;
+    }
+
+    function updateUI() {
+      UI.gold.textContent = gold;
+      UI.tickets.textContent = tickets;
+      UI.protects.textContent = protects;
+
+      if (weapons[selectedWeaponIndex]) {
+        UI.level.textContent = `현재 무기: ${weapons[selectedWeaponIndex].name} +${weapons[selectedWeaponIndex].level}`;
+      } else {
+        UI.level.textContent = `현재 무기: 없음`;
+      }
+
+      renderWeapons();
+      saveData();
+    }
+
+    function logMessage(msg) {
+      const p = document.createElement("div");
+      p.textContent = msg;
+      UI.log.prepend(p);
+    }
+
+    UI.upgradeBtn.addEventListener("click", () => {
+      const weapon = weapons[selectedWeaponIndex];
+      if (!weapon) return;
+
+      if (tickets <= 0) return logMessage("❗ 강화권 부족!");
+
+      if (weapon.level >= 15) {
+        logMessage(`⭐ ${weapon.name}은 이미 최대 레벨 +15입니다!`);
+        return;
+      }
+
+      tickets--;
+
+      const chance = getSuccessChance(weapon.level);
+      const roll = Math.random() * 100;
+      const useProtect = UI.useProtect.checked && protects > 0;
+      const success = roll < chance;
+
+      if (success) {
+        weapon.level++;
+        logMessage(`✅ ${weapon.name} 강화 성공! (+${weapon.level})`);
+        if (Math.random() < 0.3) { tickets++; logMessage("🎁 강화권 드랍!"); }
+        if (Math.random() < 0.1) { protects++; logMessage("🛡 보호권 드랍!"); }
+      } else {
+        if (useProtect) {
+          protects--;
+          logMessage(`⚠️ ${weapon.name} 강화 실패! 보호권 사용 → +${weapon.level} 유지`);
+        } else {
+          weapon.level = 0;
+          logMessage(`❌ ${weapon.name} 강화 실패 → +0`);
+        }
+      }
+
+      checkAllWeaponsMax();
+      updateUI();
+    });
+
+    function checkAllWeaponsMax() {
+      const allMax = weapons.every(w => w.level >= 15);
+      if (allMax) {
+        alert("🎉 축하합니다! 모든 무기가 +15  강화되었습니다!");
+        logMessage("🎉 축하합니다! 모든 무기가 +15  강화되었습니다!");
+      }
+    }
+
+    function renderWeapons() {
+      UI.weaponList.innerHTML = "";
+      weapons.forEach((w, i) => {
+        const box = document.createElement("div");
+        box.className = "weapon-box";
+
+        const btn = document.createElement("button");
+        btn.textContent = `${w.name} +${w.level}`;
+        btn.className = "weapon-btn";
+        if (i === selectedWeaponIndex) btn.classList.add("selected");
+        btn.onclick = () => {
+          selectedWeaponIndex = i;
+          updateUI();
+        };
+
+        const sellBtn = document.createElement("button");
+        sellBtn.textContent = `판매 (${getSellPrice(w.level)}G)`;
+        sellBtn.onclick = () => sellWeapon(i);
+
+        box.appendChild(btn);
+        box.appendChild(sellBtn);
+        UI.weaponList.appendChild(box);
+      });
+    }
+
+    function sellWeapon(index) {
+      const weapon = weapons[index];
+      const price = getSellPrice(weapon.level);
+      if (price === 0) {
+        logMessage("❗ +0 무기는 판매할 수 없습니다.");
+        return;
+      }
+
+      gold += price;
+      logMessage(`💰 ${weapon.name} +${weapon.level} 판매 → ${price}G 획득`);
+
+      // 무기 초기화 후 재생성
+      weapons[index] = { name: weapon.name, level: 0 };
+
+      updateUI();
+    }
+
+    function buy(type) {
+      if (type === "ticket" && gold >= 100) {
+        tickets++; gold -= 100; logMessage("🛒 강화권 구매!");
+      } else if (type === "protect" && gold >= 300) {
+        protects++; gold -= 300; logMessage("🛒 보호권 구매!");
+      } else {
+        logMessage("❗ 골드 부족!");
+      }
+      updateUI();
+    }
+
+    function renderChanceTable() {
+      let html = "";
+      for (let i = 0; i <= 15; i++) {
+        html += `<tr><td>+${i}</td><td>${getSuccessChance(i)}%</td></tr>`;
+      }
+      UI.table.innerHTML = html;
+    }
+
+    function saveData() {
+      const data = {
+        gold, tickets, protects, weapons, selectedWeaponIndex
+      };
+      localStorage.setItem("enhanceGameMax15", JSON.stringify(data));
+    }
+
+    function loadData() {
+      const data = JSON.parse(localStorage.getItem("enhanceGameMax15"));
+      if (data) {
+        gold = data.gold;
+        tickets = data.tickets;
+        protects = data.protects;
+        weapons = data.weapons || weapons;
+        selectedWeaponIndex = data.selectedWeaponIndex ?? 0;
+      }
+    }
+
+    function resetGame() {
+      if (!confirm("정말로 모든 데이터를 초기화하시겠습니까?")) return;
+
+      gold = 1000;
+      tickets = 10;
+      protects = 3;
+      weapons = [
+        { name: "소드", level: 0 },
+        { name: "창", level: 0 },
+        { name: "활", level: 0 }
+      ];
+      selectedWeaponIndex = 0;
+      logMessage("🔁 게임이 초기화되었습니다.");
+      localStorage.removeItem("enhanceGameMax15");
+      updateUI();
+    }
+
+    loadData();
+    updateUI();
+    renderChanceTable();
+  </script>
+
+</body>
+</html>
